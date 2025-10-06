@@ -35,6 +35,7 @@ const realtimeOrders = (category) => {
   }
   socket.addEventListener('message', ({ data }) => {
     try {
+      console.log("got message from srver", data)
       const { id, total } = JSON.parse(data)
       const item = document.querySelector(`[data-id="${id}"]`)
       if (item === null) return
