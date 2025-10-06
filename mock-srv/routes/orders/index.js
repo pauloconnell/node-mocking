@@ -1,19 +1,38 @@
-  'use strict'
-
+'use strict'
 module.exports = async function (fastify, opts) {
+  function monitorMessages(socket) {
+    socket.on('message', (data) => {
+      try {
+        const { cmd, payload } = JSON.parse(data)
+        if (cmd === 'update-category') {
+          sendCurrentOrders(payload.category, socket)
+        }
+      } catch (err) {
+        fastify.log.warn(
+          'WebSocket Message (data: %o) Error: %s',
+          data,
+          err.message
+        )
+      }
+    })
+  }
+
+  function sendCurrentOrders(category, socket) {
+    for (const order of fastify.currentOrders(category)) {
+      socket.send(order)
+    }
+  }
+
   fastify.get(
      '/:category',
     { websocket: true },
-    async (socket, request) => {
-      for (const order of fastify.currentOrders(request.params.category)) {
-        socket.send(order)
-      }
-      console.log("server says socket has: ", socket.currentOrders)
+    async ({ socket }, request) => {
+     monitorMessages(socket)
+     sendCurrentOrders(request.params.category, socket)
       for await (const order of fastify.realtimeOrders()) {
-        console.log("server says order: ", order)
-        if (socket.readyState >= socket.CLOSING) break  // socket has closed
+        if (socket.readyState >= socket.CLOSING) break
         socket.send(order)
       }
     }
   )
-} 
+}
