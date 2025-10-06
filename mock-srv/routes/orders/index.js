@@ -5,7 +5,15 @@ module.exports = async function (fastify, opts) {
      '/:category',
     { websocket: true },
     async (socket, request) => {
-      socket.send(JSON.stringify({ id: 'A1', total: 3 }))
+      for (const order of fastify.currentOrders(request.params.category)) {
+        socket.send(order)
+      }
+      console.log("server says socket has: ", socket.currentOrders)
+      for await (const order of fastify.realtimeOrders()) {
+        console.log("server says order: ", order)
+        if (socket.readyState >= socket.CLOSING) break  // socket has closed
+        socket.send(order)
+      }
     }
   )
-}
+} 

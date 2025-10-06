@@ -4,24 +4,20 @@ const { promisify } = require('util')
 const fp = require('fastify-plugin')
 const timeout = promisify(setTimeout)
 
-const orders = {
+const orders = {                      // orders format is Category ['prefix'OrderNumber]
   A1: { total: 3 },
   A2: { total: 7 },
   B1: { total: 101 },
 }
 
-const catToPrefix = {
+const catToPrefix = {                   // standard way we can change category name without messing everything up
   electronics: 'A',
   confectionery: 'B',
 }
 
-const calculateID = (idPrefix, data) => {
-  const sorted = [...(new Set(data.map(({id}) => id)))]
-  const next = Number(sorted.pop().slice(1)) + 1;
-  return `${idPrefix}${next}`
-}
 
-async function * realtimeOrdersSimulator() {
+
+async function * realtimeOrdersSimulator() {    // simulates order comming in from users
   const ids = Object.keys(orders)
   while (true) {
     const delta = Math.floor(Math.random() * 7) + 1
@@ -36,18 +32,26 @@ async function * realtimeOrdersSimulator() {
 function * currentOrders(category) {
   const idPrefix = catToPrefix[category]
   if (!idPrefix) return
-  const ids = Object.keys(orders).filter((id) => id[0] === idPrefix)
+  const ids = Object.keys(orders).filter((id) => id[0] === idPrefix)  // idPrefix is the 'category' (string bracket notation id[0] gives category A or B ect)
   for (const id of ids) {
-    yield JSON.stringify({id, ...orders[id]})
+    yield JSON.stringify({id, ...orders[id]})                         // lists all orders in that category
   }
 }
 
+const calculateID = (idPrefix, data) => {
+  const sorted = [...(new Set(data.map(({id}) => id)))]
+  const next = Number(sorted.pop().slice(1)) + 1;
+  return `${idPrefix}${next}`
+}
 
 module.exports = fp(async function (fastify, opts) {
+   fastify.decorate('currentOrders', currentOrders)
+  fastify.decorate('realtimeOrders', realtimeOrdersSimulator)
   fastify.decorateRequest('mockDataInsert', function insert (category, data) {
     const request = this
     const idPrefix = catToPrefix[category]
     const id = calculateID(idPrefix, data)
+     orders[id] = { total: 0 }
     data.push({id, ...request.body})
   })
 })
