@@ -19,34 +19,78 @@ const usage = (msg = 'Back office for My App') => {
   console.log('  ids:   my-cli list ids -c=<string> --api=<string>')
 }
 
-const argv = process.argv.slice(2)
+const noMatches = commist()             // returns null if  no matches or instance of commist if matched
+  .register('help', usage)
+  .register('h', usage)
+  .register('add order', addOrder)    // calls function when 'add order' matched
+  .register('list cats', listCats)
+  .register('list ids', listIds)
+  .parse(process.argv.slice(2)) 
 
-const args = minimist(argv, {
-  alias: { amount: 'n' },
-  string: ['api'],
-  default: { api:API }
-})
-
-if (args._.length < 1) { // argv._ is the product id 'positional' arg (not updated by minimist above - so placed into the argv._ with anything not coverted above)
+if (noMatches) {
   usage()
   process.exit(1)
 }
 
-const [ id] = args._
-const { amount, api } = args 
-
-//const amount = Number(amt)
-
-if (Number.isInteger(amount) === false) {
-  usage('Error: --amount flag is required and must be an integer')
-  process.exit(1)
-}
-
-try {
-  await got.post(`${api}/orders/${id}`, {
-    json: { amount }
+async function addOrder (argv) {
+  const args = minimist(argv, {
+    alias: { amount: 'n' },
+    string: ['api'],
+    default: { api: API }
   })
-} catch (err) {
-  console.log(err.message)
-  process.exit(1)
-}
+  if (args._.length < 1) {
+    usage()
+    process.exit(1)
+  } 
+
+  const [ id ] = args._
+  const { amount, api } = args 
+
+  if (Number.isInteger(amount) === false) {
+    usage('Error: --amount flag is required and must be an integer')
+    process.exit(1)
+  } 
+
+  try {
+    await got.post(`${api}/orders/${id}`, {
+      json: { amount }
+    }) 
+    } catch (err) {
+    console.error(err.message)
+    process.exit(1)
+  }
+} 
+
+function listCats () {
+  console.log('\nCategories:\n')
+  for (const cat of categories)
+  console.log(cat)
+  console.log()
+} 
+
+async function listIds (argv) {
+  const args = minimist(argv, {
+    alias: { cat: 'c' },
+    string: ['cat', 'api'],
+    default: { api: API }
+  }) 
+
+  const { cat, api } = args
+  if (!cat) {
+    usage('Error: --cat flag is required')
+    process.exit(1)
+  } 
+
+  try {
+    console.log(`\nCategory: ${cat}\n`)
+    console.log(' IDs:\n')
+    const products = await got(`${api}/${cat}`).json()
+    for (const { id } of products) {
+      console.log(` ${id}`)
+    }
+    console.log()
+  } catch (err) {
+    console.log(err.message)
+    process.exit(1)
+  }
+} 
