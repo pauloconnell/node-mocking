@@ -51,7 +51,7 @@ if (noMatches) {
   try {
     await tui (api)
   } catch (err) {
-    const cancelled = err === ''
+    const cancelled = err === ''  // 'enquirer' throws err => '' if user hit Ctrl+C to exit - 
     if (cancelled === false) {
       console.log(err.message)
       process.exit(1)
@@ -68,13 +68,16 @@ async function tui (api) {
   }) 
   let products = await got(`${api}/${category}`).json()
   let quit = false
+  console.log(products);
   while (true) {
     for (const { name, rrp, info } of products) {
-      console.log(chalk `
-        {bold ${name}} - {italic ${rrp}}
-        ${info}
+      console.log(`
+       ${chalk.bold(name)} ${chalk.yellow.bold(' - ')} ${chalk.italic(rrp)}
+  ${chalk.cyan(info)}
        `)
     } 
+
+    // once category is selected, form pops up to allow adding a product to this category
     const form = new enquirer.Form({
       message: 'Add',
       hint: `Press Ctrl+Q to change category`,
@@ -90,27 +93,29 @@ async function tui (api) {
         {name: 'info', message: 'Info'}
       ]
     })
-    form.on('keypress', (_, {ctrl, name}) => {
+    form.on('keypress', (_, {ctrl, name}) => {  // arguments are (keyPressed, meta-data), so we are destructuring {ctrl, name} from the metadata (ctrl is boolean flag)
       if (ctrl && name === 'q') {
-        form.cancel()
-        quit = true
+         quit = true
+        form.cancel()     // causes promise to reject
+       
       }
     })
     let add = null
     try {
-      add = await form.run()
+      add = await form.run()      // this is inside the while loop, so upon submit of each form this loop creates another so the next product can be entered
     } catch (err) {
       if (quit) {
         console.log(ansi.Esc.clearTerminal)
-        return tui(api)
+        return tui(api)             // if user quits 'add' form, we go back to select a category ie. tui(api)
       }
       throw err
     }
-    products = await got.post(`${api}/${category}`, {json: add}).json()
+    products = await got.post(`${api}/${category}`, {json: add}).json() // products updated with response from posting new products into this category
       console.log(ansiEsc.clearTerminal)
       console.log(chalk `{green ✔} {bold Category} {dim ·} {cyan ${category}}`)
-    }
+      //being in a while loop, next, it will print out the products in above category(top of this loop)
   }
+}
 
 async function addOrder (argv) {
   const args = minimist(argv, {
